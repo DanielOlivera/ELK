@@ -1,21 +1,27 @@
-from elasticsearch_dsl import connections, Index
+from elasticsearch_dsl import connections
 import logging
 
-# Configuramos logging
 logging.basicConfig(level=logging.INFO)
+es = connections.create_connection(hosts=['elasticsearch:9200'])
 
-# Crea una conexión al cluster de Elasticsearch
-connections.create_connection(hosts=['elasticsearch:9200'])
+def get_my_indices():
+    all_indices = es.indices.get_alias("*")
+    my_indices = {name: info for name, info in all_indices.items() if name.startswith('test-')}
+    return my_indices
 
-# Define el índice
-index_name = 'test-index-1'
-index = Index(index_name)
+index = get_my_indices()
 
-# Verifica si el índice existe
-if index.exists():
-    logging.info(f"Borrando índice '{index_name}'.")
-    index.delete()
-    logging.info(f"Índice '{index_name}' borrado.")
+if not index:
+    logging.info("No se encontraron índices.")
 else:
-    logging.info(f"No hay nada que borrar, el índice '{index_name}' no existe.")
+    logging.info(f"Se encontraron los siguientes índices: {', '.join(index)}")
 
+for index_name in index:
+    if es.indices.exists(index_name):
+        del_index = input(f"¿Deseas borrar el índice '{index_name}'? (s/n): ")
+        if del_index.lower() == 's':
+            logging.info(f"Borrando índice '{index_name}'.")
+            es.indices.delete(index=index_name)
+            logging.info(f"Índice '{index_name}' borrado.")
+        else:
+            logging.info(f"Índice '{index_name}' no se eliminó.")
