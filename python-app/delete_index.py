@@ -1,3 +1,4 @@
+#Lib elasticsearch_dsl
 from elasticsearch_dsl import connections
 import logging
 
@@ -6,7 +7,7 @@ es = connections.create_connection(hosts=['elasticsearch:9200'])
 
 def get_my_indices():
     all_indices = es.indices.get_alias("*")
-    my_indices = {name: info for name, info in all_indices.items() if name.startswith('test-')}
+    my_indices = {name: info for name, info in all_indices.items() if name.startswith('index-')}
     return my_indices
 
 index = get_my_indices()
