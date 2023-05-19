@@ -26,7 +26,6 @@ class Cliente(Document):
         }
 
 Cliente.init()
-cliente = Cliente()
 
 mapas_directory = "mapas"
 if not os.path.exists(mapas_directory):
@@ -70,7 +69,7 @@ def create_map(geolocalizacion):
     lat = float(geoloc[0])
     lon = float(geoloc[1])
     mapa = folium.Map(location=[lat, lon], zoom_start=13)
-    folium.Marker([lat, lon], popup=cliente.nombre_completo).add_to(mapa)
+    folium.Marker([lat, lon]).add_to(mapa)
     return mapa
 
 def main():
