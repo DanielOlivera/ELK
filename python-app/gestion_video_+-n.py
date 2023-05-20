@@ -24,6 +24,8 @@ class Pelicula(Document):
             'number_of_shards': 1,
             'number_of_replicas': 0
         }
+        
+Pelicula.init()
 
 class RegistroResta(Document):
     cantidad_resta = Integer()
@@ -37,7 +39,6 @@ class RegistroResta(Document):
             'number_of_replicas': 0
         }
 
-Pelicula.init()
 RegistroResta.init()
 
 def validate_integer(prompt):
