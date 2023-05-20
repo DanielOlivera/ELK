@@ -37,22 +37,6 @@ class ClienteBan(Document):
 
 ClienteBan.init()
 
-def validate_date(prompt):
-    while True:
-        date_string = input(prompt)
-        try:
-            return datetime.strptime(date_string, '%Y-%m-%d').date()
-        except ValueError:
-            logging.info("Debes introducir una fecha en el formato AAAA-MM-DD. Intenta de nuevo.")
-
-def validate_phone(prompt):
-    while True:
-        phone = input(prompt)
-        if phone.isdigit() and len(phone) == 8:
-            return phone
-        else:
-            logging.info("Debes introducir un número de celular válido (8 dígitos numéricos). Intenta de nuevo.")
-
 def search_client(query):
     s = Search(index='index-clientes').query("multi_match", query=query, fields=['_id', 'nombre_completo', 'numero_celular'])
     response = s.execute()
@@ -70,7 +54,7 @@ def search_banned_client(cliente_id):
 def ban_client(cliente):
     cliente_ban = search_banned_client(cliente.meta.id)
     if cliente_ban:
-        logging.info("El cliente ya está baneado.")
+        logging.info("El cliente ya esta baneado.")
         desbanear = input("¿Desea desbanear al cliente? (s/n): ")
         if desbanear.lower() == "s":
             ClienteBan.get(id=cliente_ban.meta.id).delete()
@@ -84,7 +68,7 @@ def ban_client(cliente):
             cliente_ban.save()
             logging.info(f"Cliente '{cliente.nombre_completo}' baneado exitosamente.")
         else:
-            logging.info(f"No se realizó el baneo del cliente '{cliente.nombre_completo}'.")
+            logging.info(f"No se realiz0 el baneo del cliente '{cliente.nombre_completo}'.")
 
 def get_all_clients():
     s = Search(index='index-clientes').source(['_id', 'nombre_completo', 'numero_celular'])
@@ -102,11 +86,11 @@ def main():
     for cliente in clientes:
         logging.info(f"_id: {cliente.meta.id}, Nombre completo: {cliente.nombre_completo}, Numero de celular: {cliente.numero_celular}")
 
-    query = input("Introduce el término de búsqueda (id, nombre, celular): ")
+    query = input("Introduce el termino de busqueda (id, nombre, celular): ")
     cliente = search_client(query)
 
     if cliente is None:
-        logging.info(f"No se encontró ningún cliente con el criterio de búsqueda proporcionado '{query}'.")
+        logging.info(f"No se encontro ningun cliente con el criterio de busqueda proporcionado '{query}'.")
         return
 
     ban_client(cliente)

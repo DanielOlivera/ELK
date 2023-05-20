@@ -28,8 +28,9 @@ class Pelicula(Document):
 Pelicula.init()
 
 class RegistroResta(Document):
-    cantidad_resta = Integer()
+    titulo = Text(fields={'raw': Keyword()})
     motivo = Text(fields={'raw': Keyword()})
+    cantidad_resta = Integer()
     fecha_registro = Date()
 
     class Index:
@@ -65,18 +66,17 @@ def add_copies(pelicula):
    
 def subtract_copies(pelicula):
     num_copias = validate_integer("Introduce el numero de copias a restar: ")
-    razon_resta = input("Introduce la razon de la resta de copias: ")
-    
     pelicula_obj = Pelicula.get(id=pelicula.meta.id)
+    if num_copias > pelicula_obj.numero_copias:
+        logging.info("No es posible restar más copias de las disponibles.")
+        return
     pelicula_obj.numero_copias -= num_copias
     pelicula_obj.save()
-    
-    ###Aumentar al nuevo DOC la pelicula a la que se le resto unidades
-    
-    registro_resta = RegistroResta(cantidad_resta=num_copias, motivo=razon_resta, fecha_registro=datetime.now())
+    razon_resta = input("Introduce la razon de la resta de copias: ")
+    registro_resta = RegistroResta(titulo=pelicula_obj.titulo, motivo=razon_resta, cantidad_resta=num_copias, fecha_registro=datetime.now())
     registro_resta.save()
-    
     logging.info(f"Se restaron {num_copias} copias de la pelicula '{pelicula_obj.titulo}' por la siguiente razon: {razon_resta}.")
+    logging.info(f"Ahora tiene {pelicula_obj.numero_copias} copias disponibles de {pelicula_obj.titulo}.")
 
 def get_movie(query):
     s = Search(index='index-peliculas').query("multi_match", query=query, fields=['titulo', '_id'])
