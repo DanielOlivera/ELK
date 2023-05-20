@@ -110,6 +110,7 @@ def main():
         return
 
     ban_client(cliente)
+    logging.info(f"Cliente '{cliente.nombre_completo}' baneado exitosamente.")
 
 if __name__ == "__main__":
     main()
