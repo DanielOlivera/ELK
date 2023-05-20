@@ -78,12 +78,16 @@ def delete_html_file(cliente):
     if os.path.exists(html_filepath):
         os.remove(html_filepath)
 
-def save_html_file(geolocalizacion):
-    mapa = create_map(geolocalizacion)
-    html_filename = f"{Cliente.meta.id}_{Cliente.nombre_completo}_{Cliente.numero_celular}.html"
-    html_filepath = os.path.join(mapas_directory, html_filename)
-    mapa.save(html_filepath)
-    logging.info(f"Se ha generado el mapa con la ubicacion del cliente. El archivo se guardo como '{html_filename}'.")
+def save_html_file(cliente):
+    geolocalizacion = cliente.geolocalizacion_direccion
+    if geolocalizacion:
+        mapa = create_map(geolocalizacion)
+        html_filename = f"{cliente.meta.id}_{cliente.nombre_completo}_{cliente.numero_celular}.html"
+        html_filepath = os.path.join(mapas_directory, html_filename)
+        mapa.save(html_filepath)
+        logging.info(f"Se ha generado el mapa con la ubicacion del cliente. El archivo se guardo como '{html_filename}'.")
+    else:
+        logging.info("El cliente no tiene una geolocalizacion definida.")
 
 def search_client(query):
     s = Search(index='index-clientes').query("multi_match",query=query, fields = ['_id', 'nombre_completo', 'numero_celular'])
@@ -135,6 +139,13 @@ def main():
     logging.info(f"Fecha de nacimiento: {cliente.fecha_nacimiento}")
     logging.info(f"Dirección: {cliente.direccion}")
     logging.info(f"Geolocalizacion de la direccion: {cliente.geolocalizacion_direccion}")
+    
+    geoloc_anterior = cliente.geolocalizacion_direccion
+    cliente_anterior = cliente.nombre_completo
+    numero_anterior = cliente.numero_celular
+    nuevo_nombre = None
+    nuevo_celular = None
+    nueva_geoloc = None
 
     modificar_nombre = input("¿Deseas modificar el nombre completo? (s/n): ")
     if modificar_nombre.lower() == "s":
@@ -163,21 +174,20 @@ def main():
 
     modificar_geoloc = input("¿Deseas modificar la geolocalizacion de la direccion? (s/n): ")
     if modificar_geoloc.lower() == "s":
-        geoloc_anterior = cliente.geolocalizacion_direccion
         nueva_geoloc = validate_geolocation("Introduce la nueva geolocalizacion de la direccion (latitud longitud): ")
         cliente.geolocalizacion_direccion = nueva_geoloc
         
-        if not os.path.exists(os.path.join(mapas_directory, f"{cliente.meta.id}_{cliente.nombre_completo}_{cliente.numero_celular}.html")):
+        if not os.path.exists(os.path.join(mapas_directory, f"{cliente.meta.id}_{cliente_anterior}_{numero_anterior}.html")):
             crear_mapa = input("No se ha generado un mapa HTML para este cliente. ¿Deseas generar uno ahora? (s/n): ")
             if crear_mapa.lower() == "s":
                 save_html_file(cliente)
         
         elif cliente.nombre_completo != nuevo_nombre or cliente.numero_celular != nuevo_celular or geoloc_anterior != nueva_geoloc:
-            delete_html_file(cliente)
+            logging.info(f"Modificando mapa del cliente: {cliente.nombre_completo}")
+            delete_html_file(cliente)  ###MOD delete_html_file, borra y crea el nuevo cliente.html, solo deberia borrar el cliente anterior a las modificaciones
             save_html_file(cliente)
 
     save_changes(cliente)
 
 if __name__ == "__main__":
     main()
-

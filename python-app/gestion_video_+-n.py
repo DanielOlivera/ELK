@@ -70,6 +70,8 @@ def subtract_copies(pelicula):
     pelicula_obj.numero_copias -= num_copias
     pelicula_obj.save()
     
+    ###Aumentar al nuevo DOC la pelicula a la que se le resto unidades
+    
     registro_resta = RegistroResta(cantidad_resta=num_copias, motivo=razon_resta, fecha_registro=datetime.now())
     registro_resta.save()
     
