@@ -58,7 +58,7 @@ class Pelicula(Document):
 
 Pelicula.init()
 
-class Factura(Document):
+class Renta(Document):
     cliente = Text()
     fecha_prestamo = Text()
     fecha_devolucion = Text()
@@ -66,13 +66,26 @@ class Factura(Document):
     peliculas_prestadas = Text()
 
     class Index:
-        name = 'index-facturas'
+        name = 'index-rentas'
         settings = {
             'number_of_shards': 1,
             'number_of_replicas': 0
         }
 
-Factura.init()
+Renta.init()
+
+class RentaHistorial(Document):
+    cliente_nombre = Text()
+    peliculas_prestadas = Text()
+
+    class Index:
+        name = 'index-renta-historial'
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
+
+RentaHistorial.init()
 
 def search_client(query):
     s = Search(index='index-clientes').query("multi_match", query=query, fields=['_id', 'nombre_completo'])
@@ -205,18 +218,20 @@ def facturacion(cliente, peliculas_rentadas):
     logging.info(f"Durante {num_dias} dias a partir de la fecha {fecha_actual}")
     logging.info(f"Fecha de devolucion: {fecha_devolucion}")
     logging.info(f"Costo total: {costo_total:.2f} con un descuento del {descuento}%")
-    factura(cliente.nombre_completo, fecha_actual, fecha_devolucion, costo_total, peliculas_rentadas)
+    renta(cliente.nombre_completo, fecha_actual, fecha_devolucion, costo_total, peliculas_rentadas)
+    guardar_en_historial(cliente, peliculas_rentadas)
+    
 
-def factura(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_prestadas):
-    # Obtener el último ID del índice historial
-    s = Search(index='index-facturas').sort({"_id": {"order": "desc"}})
+def renta(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_prestadas):
+    # Obtener el último ID del índice renta
+    s = Search(index='index-rentas').sort({"_id": {"order": "desc"}})
     response = s.execute()
     if response.hits.total.value > 0:
         last_id = int(response.hits[0].meta.id)
     else:
         last_id = -1
     next_id = last_id + 1
-    # Generar el nuevo documento para el índice historial
+    # Generar el nuevo documento para el índice renta
     doc = {
         "_id": next_id,
         "cliente": cliente,
@@ -225,8 +240,23 @@ def factura(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_
         "importe_total": importe_total,
         "peliculas_prestadas": peliculas_prestadas
     }
-    Factura(meta={'id': doc["_id"]}, **doc).save()
-    logging.info("Registro guardado en el historial correctamente.")
+    Renta(meta={'id': doc["_id"]}, **doc).save()
+    logging.info("Registro guardado en el historial de renta correctamente.")
+    return
+
+def guardar_en_historial(cliente, peliculas_rentadas):
+    cliente_nombre = cliente.nombre_completo
+    id_cliente = cliente.meta.id
+
+    # Generar el nuevo documento para el índice index-renta-historial
+    doc = {
+        "cliente_nombre": cliente_nombre,
+        "id_cliente": id_cliente,
+        "peliculas_prestadas": peliculas_rentadas
+    }
+    
+    RentaHistorial(**doc).save()
+    logging.info("Registro guardado en el historial de renta correctamente.")
     return
 
 def main():
