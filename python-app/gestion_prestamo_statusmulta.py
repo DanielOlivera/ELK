@@ -46,10 +46,15 @@ def calcular_status_multas(renta_seleccionada):
         status = 'En Curso'
     elif dias_retraso <= 5:
         status = 'En Mora'
-        multa = dias_retraso * 10  # Valor de la multa por dia
+        multa = dias_retraso * 10  # Valor de la multa por dia//Añadir index-multa a gestion_prestamo_redntadescuento.py, asi la
+                                   # Multa se setea por defecto.
     else:
         status = 'Perdida'
         multa = dias_retraso
+        ####
+        #Agregar funcionalidad, Restar una unidad al indice index-peliculas, y añadir el regsitro de la perdida a index'substract
+        #Agregar funcionalidad, bannear automaticamente al cliente cuyo status en cualquiera de sus registros sea 'Perdida'
+        ####
     # Actualizar los campos de status y multa en los registros de rentas
     peliculas_modificadas = []
     for hit in response.hits:

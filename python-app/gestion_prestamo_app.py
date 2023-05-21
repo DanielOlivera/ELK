@@ -63,7 +63,7 @@ class Renta(Document):
     cliente = Text()
     fecha_prestamo = Text()
     fecha_devolucion = Text()
-    importe_total = Text()
+    importe_total = Integer()
     peliculas_prestadas = Text()
     status = Text()
     multa = Integer()
@@ -399,3 +399,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
