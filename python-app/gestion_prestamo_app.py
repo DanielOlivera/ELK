@@ -151,94 +151,154 @@ def main():
         return
 
     if check_cliente_baneado(cliente):
-        logging.info(f"El cliente '{cliente.meta.id}' está baneado. No se pueden realizar más operaciones.")
+        logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' está baneado. No se pueden realizar más operaciones.")
         return
     else:
-        logging.info(f"El cliente '{cliente.meta.id}' no está baneado. Puede continuar con las operaciones.")
-    
-    opcion_busqueda = int(input("Selecciona una opción de búsqueda:\n1. Título\n2. Género\n3. Actores\n4. Nominaciones al Oscar\nOpción: "))
+        logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' no está baneado. Puede continuar con las operaciones.")
 
-    if opcion_busqueda == 1:
-        titles = get_all_titles()
-        logging.info("Títulos de películas disponibles:")
-        for i, titulo in enumerate(titles):
-            logging.info(f"{i+1}. Título: {titulo}")
-        
-        opcion_pelicula = int(input("Selecciona una película para rentar: "))
-        
-        if opcion_pelicula < 1 or opcion_pelicula > len(titles):
-            logging.info("Opción inválida. Saliendo del programa.")
-            return
-        
-        pelicula_elegida = titles[opcion_pelicula - 1]
-        logging.info(f"Se ha rentado la película '{pelicula_elegida}' al cliente '{cliente.meta.id}'.")
-    
-    elif opcion_busqueda == 2:
-        genres = get_all_genres()
-        logging.info("Géneros de películas disponibles:")
-        for i, genero in enumerate(genres):
-            logging.info(f"{i+1}. Género: {genero}")
-        
-        opcion_genero = int(input("Selecciona un género: "))
-        
-        if opcion_genero < 1 or opcion_genero > len(genres):
-            logging.info("Opción inválida. Saliendo del programa.")
-            return
-        
-        peliculas = search_movies_by_genre(genres[opcion_genero - 1])
-        
-        if not peliculas:
-            logging.info(f"No se encontraron películas con el género '{genres[opcion_genero - 1]}'.")
-            return
-        
-        logging.info("Películas encontradas:")
-        for i, pelicula in enumerate(peliculas):
-            logging.info(f"{i+1}. Título: {pelicula.titulo}")
-        
-        opcion_pelicula = int(input("Selecciona una película para rentar: "))
-        
-        if opcion_pelicula < 1 or opcion_pelicula > len(peliculas):
-            logging.info("Opción inválida. Saliendo del programa.")
-            return
-        
-        pelicula_elegida = peliculas[opcion_pelicula - 1]
-        logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
+    logging.info(f"'{cliente.nombre_completo}'-'{cliente.meta.id}' qué películas desea rentar")
 
+    peliculas_rentadas = []
 
-    
-    elif opcion_busqueda == 3:
-        actors = get_all_actors()
-        logging.info("Actores de películas disponibles:")
-        for i, actor_title in enumerate(actors):
-            logging.info(f"{i+1}. Actor: {actor_title['actor']} - Título: {actor_title['titulo']}")
-        
-        opcion_pelicula = int(input("Selecciona una película para rentar: "))
-        
-        if opcion_pelicula < 1 or opcion_pelicula > len(actors):
-            logging.info("Opción inválida. Saliendo del programa.")
-            return
-        
-        pelicula_elegida = actors[opcion_pelicula - 1]
-        logging.info(f"Se ha rentado la película '{pelicula_elegida['titulo']}' al cliente '{cliente.meta.id}'.")
+    while True:
+        opcion_busqueda = int(input("Selecciona una opción de búsqueda:\n1. Título\n2. Género\n3. Actores\n4. Nominaciones al Oscar\n5. Salir\nOpción: "))
 
-    
-    elif opcion_busqueda == 4:
-        movies = get_all_movies_ordered_by_nominations()
-        logging.info("Películas ordenadas por número de nominaciones al Oscar:")
-        for i, pelicula in enumerate(movies):
-            logging.info(f"{i+1}. Título: {pelicula.titulo}, Nominaciones al Oscar: {pelicula.nominaciones_oscar}")
-        
-        opcion_pelicula = int(input("Selecciona una película para rentar: "))
-        
-        if opcion_pelicula < 1 or opcion_pelicula > len(movies):
-            logging.info("Opción inválida. Saliendo del programa.")
-            return
-        
-        pelicula_elegida = movies[opcion_pelicula - 1]
-        logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
-    
-    else:
-        logging.info("Opción inválida. Saliendo del programa.")
+        if opcion_busqueda == 1:
+            titles = get_all_titles()
+            logging.info("Títulos de películas disponibles:")
+            for i, titulo in enumerate(titles):
+                if titulo in peliculas_rentadas:
+                    continue
+                logging.info(f"{i+1}. Título: {titulo}")
+                
+            if len(peliculas_rentadas) == len(titles):
+                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                continue
+
+            opcion_pelicula = int(input("Selecciona una película para rentar: "))
+
+            if opcion_pelicula < 1 or opcion_pelicula > len(titles):
+                logging.info("Opción inválida. Inténtalo de nuevo.")
+                continue
+
+            pelicula_elegida = titles[opcion_pelicula - 1]
+
+            if pelicula_elegida in peliculas_rentadas:
+                logging.info(f"La película '{pelicula_elegida}' ya ha sido rentada previamente.")
+                continue
+
+            peliculas_rentadas.append(pelicula_elegida)
+            logging.info(f"Se ha rentado la película '{pelicula_elegida}' al cliente '{cliente.meta.id}'.")
+
+        elif opcion_busqueda == 2:
+            genres = get_all_genres()
+            logging.info("Géneros de películas disponibles:")
+            for i, genero in enumerate(genres):
+                if genero in peliculas_rentadas:
+                    continue
+                logging.info(f"{i+1}. Género: {genero}")
+                
+            if len(peliculas_rentadas) == len(titles):
+                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                continue
+
+            opcion_genero = int(input("Selecciona un género: "))
+
+            if opcion_genero < 1 or opcion_genero > len(genres):
+                logging.info("Opción inválida. Inténtalo de nuevo.")
+                continue
+
+            peliculas = search_movies_by_genre(genres[opcion_genero - 1])
+
+            if not peliculas:
+                logging.info(f"No se encontraron películas con el género '{genres[opcion_genero - 1]}'.")
+                continue
+
+            logging.info("Películas encontradas:")
+            for i, pelicula in enumerate(peliculas):
+                if pelicula.titulo in peliculas_rentadas:
+                    continue
+                logging.info(f"{i+1}. Título: {pelicula.titulo}")
+
+            opcion_pelicula = int(input("Selecciona una película para rentar: "))
+
+            if opcion_pelicula < 1 or opcion_pelicula > len(peliculas):
+                logging.info("Opción inválida. Inténtalo de nuevo.")
+                continue
+
+            pelicula_elegida = peliculas[opcion_pelicula - 1]
+
+            if pelicula_elegida.titulo in peliculas_rentadas:
+                logging.info(f"La película '{pelicula_elegida.titulo}' ya ha sido rentada previamente.")
+                continue
+
+            peliculas_rentadas.append(pelicula_elegida.titulo)
+            logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
+
+        elif opcion_busqueda == 3:
+            actors = get_all_actors()
+            logging.info("Actores de películas disponibles:")
+            for i, actor_title in enumerate(actors):
+                if actor_title['titulo'] in peliculas_rentadas:
+                    continue
+                logging.info(f"{i+1}. Actor: {actor_title['actor']} - Título: {actor_title['titulo']}")
+            
+            if len(peliculas_rentadas) == len(titles):
+                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                continue
+            
+            opcion_actor = int(input("Selecciona una película para rentar: "))
+
+            if opcion_actor < 1 or opcion_actor > len(actors):
+                logging.info("Opción inválida. Inténtalo de nuevo.")
+                continue
+
+            pelicula_elegida = actors[opcion_actor - 1]
+
+            if pelicula_elegida['titulo'] in peliculas_rentadas:
+                logging.info(f"La película '{pelicula_elegida['titulo']}' ya ha sido rentada previamente.")
+                continue
+            
+            peliculas_rentadas.append(pelicula_elegida['titulo'])
+            logging.info(f"Se ha rentado la película '{pelicula_elegida['titulo']}' al cliente '{cliente.meta.id}'.")
+
+        elif opcion_busqueda == 4:
+            movies = get_all_movies_ordered_by_nominations()
+            logging.info("Películas ordenadas por número de nominaciones al Oscar:")
+            for i, pelicula in enumerate(movies):
+                if pelicula.titulo in peliculas_rentadas:
+                    continue
+                logging.info(f"{i+1}. Título: {pelicula.titulo}, Nominaciones al Oscar: {pelicula.nominaciones_oscar}")
+
+            if len(peliculas_rentadas) == len(titles):
+                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                continue
+            
+            opcion_pelicula = int(input("Selecciona una película para rentar: "))
+
+            if opcion_pelicula < 1 or opcion_pelicula > len(movies):
+                logging.info("Opción inválida. Inténtalo de nuevo.")
+                continue
+
+            pelicula_elegida = movies[opcion_pelicula - 1]
+
+            if pelicula_elegida.titulo in peliculas_rentadas:
+                logging.info(f"La película '{pelicula_elegida.titulo}' ya ha sido rentada previamente.")
+                continue
+
+            peliculas_rentadas.append(pelicula_elegida.titulo)
+            logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
+
+        elif opcion_busqueda == 5:
+            logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' ha rentado las siguientes películas:")
+            for pelicula_rentada in peliculas_rentadas:
+                logging.info(f"Película: {pelicula_rentada}")
+            logging.info("Saliendo del programa.")
+            break
+
+        else:
+            logging.info("Opción inválida. Inténtalo de nuevo.")
+
 
 if __name__ == "__main__":
     main()
