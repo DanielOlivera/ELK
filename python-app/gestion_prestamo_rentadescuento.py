@@ -1,240 +1,244 @@
-from elasticsearch_dsl import Document, Integer, connections, Float
+from elasticsearch_dsl import Document, Date, Keyword, Text, connections, Search, Q, GeoPoint, Integer, Float
+from datetime import datetime
 import logging
 
 logging.basicConfig(level=logging.INFO)
 connections.create_connection(hosts=['elasticsearch:9200'])
 
-class Costo(Document):
-    dias = Integer(multi=True)
-    costos = Float(multi=True)
+class Cliente(Document):
+    nombre_completo = Text(fields={'raw': Keyword()})
+    numero_celular = Keyword()
+    correo_electronico = Keyword()
+    fecha_nacimiento = Date()
+    direccion = Text(fields={'raw': Keyword()})
+    geolocalizacion_direccion = GeoPoint()
+    fecha_registro = Date()
 
     class Index:
-        name = 'index-costos'
+        name = 'index-clientes'
         settings = {
             'number_of_shards': 1,
             'number_of_replicas': 0
         }
 
-Costo.init()
+Cliente.init()
 
-class Descuento(Document):
-    cantidades = Integer(multi=True)
-    porcentajes = Float(multi=True)
+class ClienteBan(Document):
+    nombre_cliente = Text(fields={'raw': Keyword()})
+    motivo = Text(fields={'raw': Keyword()})
+    fecha_baneo = Date()
 
     class Index:
-        name = 'index-descuentos'
+        name = 'index-ban'
         settings = {
             'number_of_shards': 1,
             'number_of_replicas': 0
         }
 
-Descuento.init()
+ClienteBan.init()
 
-def validate_integer(prompt):
-    while True:
-        try:
-            value = int(input(prompt))
-            if value >= 0:
-                return value
-            else:
-                logging.info("Debes introducir un numero entero no negativo. Intenta de nuevo.")
-        except ValueError:
-            logging.info("Debes introducir un numero entero. Intenta de nuevo.")
+class Pelicula(Document):
+    duracion_minutos = Integer()
+    genero = Text(fields={'raw': Keyword()})
+    titulo = Text(fields={'raw': Keyword()})
+    titulo_alternativo = Text(fields={'raw': Keyword()})
+    fecha_lanzamiento = Date()
+    nominaciones_oscar = Integer()
+    premios_oscar = Integer()
+    actores = Text(fields={'raw': Keyword()})
+    costo_unitario = Float()
+    numero_copias = Integer()
 
-def validate_float(prompt):
-    while True:
-        try:
-            value = float(input(prompt))
-            return value
-        except ValueError:
-            logging.info("Debes introducir un numero decimal. Intenta de nuevo.")
+    class Index:
+        name = 'index-peliculas'
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
 
-def create_cost():
-    num_dias = validate_integer("Introduce el numero de dias: ")
-    dias = list(range(1, num_dias + 1))
-    costos = []
-    for dia in dias:
-        costo = validate_float(f"Introduce el costo para el dia {dia}: ")
-        costos.append(costo)
-    documento = {
-        "dias": dias,
-        "costos": costos
-    }
-    costo_doc = Costo(**documento)
-    costo_doc.save()
-    logging.info("Costos creados exitosamente.")
-    return
+Pelicula.init()
 
-def create_discount():
-    num_cantidades = validate_integer("Introduce la cantidad de opciones (cantidad de posibles opciones de descuento relacionadas a la cantidad de unidades rentadas) de descuento: ")
-    cantidades = []
-    porcentajes = []
-    for i in range(num_cantidades):
-        cantidad = validate_integer(f"Introduce la cantidad necesaria de unidades/peliculas para proceder al descuento: {i+1}: ")
-        porcentaje = validate_float(f"Introduce el porcentaje de descuento asociado a la cantidad de unidades/peliculas {cantidad}: ")
-        cantidades.append(cantidad)
-        porcentajes.append(porcentaje)
-    documento = {
-        "cantidades": cantidades,
-        "porcentajes": porcentajes
-    }
-    descuento_doc = Descuento(**documento)
-    descuento_doc.save()
-    logging.info("Descuento creado exitosamente.")
-    return
+def search_client(query):
+    s = Search(index='index-clientes').query("multi_match", query=query, fields=['_id', 'nombre_completo'])
+    response = s.execute()
+    if response.hits:
+        return response.hits[0]
+    return None
 
-def modify_cost():
-    costos = Costo.search().execute()
-    if costos.hits.total.value == 0:
-        logging.info("No existen lista de renta para modificar.")
+def get_all_clients():
+    s = Search(index='index-clientes').source(['_id', 'nombre_completo'])
+    response = s.execute()
+    return response.hits
+
+def search_pelicula(query):
+    s = Search(index='index-peliculas').query(
+        Q('multi_match', query=query, fields=['titulo', 'genero', 'actores', 'nominaciones_oscar'])
+    )
+    response = s.execute()
+    if response.hits:
+        return response.hits
+    return None
+
+def check_cliente_baneado(cliente):
+    s = Search(index='index-ban').query(
+        Q('term', nombre_cliente=cliente.meta.id) |
+        Q('term', _id=cliente.meta.id)
+    )
+    response = s.execute()
+    if response.hits:
+        return True
+    return False
+
+def search_pelicula(query):
+    s = Search(index='index-peliculas').query("multi_match", query=query, fields=['titulo', 'genero', 'actores', 'nominaciones_oscar'])
+    response = s.execute()
+    if response.hits:
+        return response.hits
+    return []
+
+def get_all_titles():
+    s = Search(index='index-peliculas').source(['titulo'])
+    response = s.execute()
+    return [hit.titulo for hit in response.hits]
+
+def get_all_genres():
+    s = Search(index='index-peliculas').source(['genero'])
+    response = s.execute()
+    genres = []
+    for hit in response.hits:
+        if hit.genero not in genres:
+            genres.append(hit.genero)
+    return genres
+
+def search_movies_by_genre(genre):
+    s = Search(index='index-peliculas').query("match", genero=genre)
+    response = s.execute()
+    if response.hits:
+        return response.hits
+    return []
+
+def get_all_actors():
+    s = Search(index='index-peliculas').source(['actores', 'titulo'])
+    response = s.execute()
+    actors = []
+    for hit in response.hits:
+        actor_title = {'actor': hit.actores, 'titulo': hit.titulo}
+        if actor_title not in actors:
+            actors.append(actor_title)
+    return actors
+
+def get_all_movies_ordered_by_nominations():
+    s = Search(index='index-peliculas').sort({'nominaciones_oscar': {'order': 'desc'}})
+    response = s.execute()
+    return response.hits
+
+def main():
+    clientes = get_all_clients()
+
+    if not clientes:
+        logging.info("No hay clientes registrados.")
         return
-    if costos:
-        num_elementos_actual = len(costos[0].dias)
+
+    logging.info("Clientes registrados:")
+    for cliente in clientes:
+        logging.info(f"_id: {cliente.meta.id}, Nombre completo: {cliente.nombre_completo}")
+
+    query = input("Introduce el término de búsqueda (id, nombre): ")
+    cliente = search_client(query)
+
+    if cliente is None:
+        logging.info(f"No se encontró ningún cliente con el criterio de búsqueda proporcionado '{query}'.")
+        return
+
+    if check_cliente_baneado(cliente):
+        logging.info(f"El cliente '{cliente.meta.id}' está baneado. No se pueden realizar más operaciones.")
+        return
     else:
-        num_elementos_actual = 0
-    if num_elementos_actual == 0:
-        logging.info("El rango de renta esta vacio. No se pueden realizar modificaciones.")
-        return ###No es realemnte necesario hacer la validacion de si existe o no la lista o si la lista tiene o no elementos en ella (posible caos modificable dentro de main)
-    logging.info(f"Rango actual de renta: {num_elementos_actual} dias")
-    logging.info(f"Cantidad: {costos[0].dias}, Porcentaje: {costos[0].costos}")
-    logging.info("")
-    opcion = validate_integer("Seleccione una opcion:\n1. Modificar lista actual\n2. Modificar el rango de dias de renta\n3. Salir\nIntroduce el numero de la opcion deseada: ")
-    if opcion == 1:
-        for costo in costos:
-            for i in range(len(costo.dias)):
-                costo_nuevo = validate_float(f"Introduce el nuevo costo para el dia {costo.dias[i]}: ")
-                costo.costos[i] = costo_nuevo
-            costo.save()
-        logging.info("Costos de renta para cada dia modificados exitosamente.")      
-    elif opcion == 2:
-        num_elementos_nuevo = validate_integer("Introduce el nuevo rango de dias de renta: ")
-        if num_elementos_nuevo < 1:
-            logging.info("El nuevo rango de dias debe ser un número entero positivo mayor o igual a 1.")
+        logging.info(f"El cliente '{cliente.meta.id}' no está baneado. Puede continuar con las operaciones.")
+    
+    opcion_busqueda = int(input("Selecciona una opción de búsqueda:\n1. Título\n2. Género\n3. Actores\n4. Nominaciones al Oscar\nOpción: "))
+
+    if opcion_busqueda == 1:
+        titles = get_all_titles()
+        logging.info("Títulos de películas disponibles:")
+        for i, titulo in enumerate(titles):
+            logging.info(f"{i+1}. Título: {titulo}")
+        
+        opcion_pelicula = int(input("Selecciona una película para rentar: "))
+        
+        if opcion_pelicula < 1 or opcion_pelicula > len(titles):
+            logging.info("Opción inválida. Saliendo del programa.")
             return
-        nuevos_dias = list(range(1, num_elementos_nuevo + 1))
-        nuevos_costos = []
-        for i in range(num_elementos_nuevo):
-            nuevo_valor = validate_float(f"Introduce el nuevo valor para el día {i+1}: ")
-            nuevos_costos.append(nuevo_valor)
-        for costo in costos:
-            costo.dias = nuevos_dias
-            costo.costos = nuevos_costos
-            costo.save()
-        logging.info(f"El rango total de dias de renta ha sido modificada a: {num_elementos_nuevo}.")
-    elif opcion == 3:
-        logging.info("Saliendo del programa.")
-        return
+        
+        pelicula_elegida = titles[opcion_pelicula - 1]
+        logging.info(f"Se ha rentado la película '{pelicula_elegida}' al cliente '{cliente.meta.id}'.")
+    
+    elif opcion_busqueda == 2:
+        genres = get_all_genres()
+        logging.info("Géneros de películas disponibles:")
+        for i, genero in enumerate(genres):
+            logging.info(f"{i+1}. Género: {genero}")
+        
+        opcion_genero = int(input("Selecciona un género: "))
+        
+        if opcion_genero < 1 or opcion_genero > len(genres):
+            logging.info("Opción inválida. Saliendo del programa.")
+            return
+        
+        peliculas = search_movies_by_genre(genres[opcion_genero - 1])
+        
+        if not peliculas:
+            logging.info(f"No se encontraron películas con el género '{genres[opcion_genero - 1]}'.")
+            return
+        
+        logging.info("Películas encontradas:")
+        for i, pelicula in enumerate(peliculas):
+            logging.info(f"{i+1}. Título: {pelicula.titulo}")
+        
+        opcion_pelicula = int(input("Selecciona una película para rentar: "))
+        
+        if opcion_pelicula < 1 or opcion_pelicula > len(peliculas):
+            logging.info("Opción inválida. Saliendo del programa.")
+            return
+        
+        pelicula_elegida = peliculas[opcion_pelicula - 1]
+        logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
+
+
+    
+    elif opcion_busqueda == 3:
+        actors = get_all_actors()
+        logging.info("Actores de películas disponibles:")
+        for i, actor_title in enumerate(actors):
+            logging.info(f"{i+1}. Actor: {actor_title['actor']} - Título: {actor_title['titulo']}")
+        
+        opcion_pelicula = int(input("Selecciona una película para rentar: "))
+        
+        if opcion_pelicula < 1 or opcion_pelicula > len(actors):
+            logging.info("Opción inválida. Saliendo del programa.")
+            return
+        
+        pelicula_elegida = actors[opcion_pelicula - 1]
+        logging.info(f"Se ha rentado la película '{pelicula_elegida['titulo']}' al cliente '{cliente.meta.id}'.")
+
+    
+    elif opcion_busqueda == 4:
+        movies = get_all_movies_ordered_by_nominations()
+        logging.info("Películas ordenadas por número de nominaciones al Oscar:")
+        for i, pelicula in enumerate(movies):
+            logging.info(f"{i+1}. Título: {pelicula.titulo}, Nominaciones al Oscar: {pelicula.nominaciones_oscar}")
+        
+        opcion_pelicula = int(input("Selecciona una película para rentar: "))
+        
+        if opcion_pelicula < 1 or opcion_pelicula > len(movies):
+            logging.info("Opción inválida. Saliendo del programa.")
+            return
+        
+        pelicula_elegida = movies[opcion_pelicula - 1]
+        logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
+    
     else:
         logging.info("Opción inválida. Saliendo del programa.")
 
-  
-def modify_discount():
-    descuentos = Descuento.search().execute()
-    if descuentos.hits.total.value == 0:
-        logging.info("No existe un descuento para modificar.")
-        return
-    if descuentos:
-        num_elementos_actual = len(descuentos[0].cantidades)
-    else:
-        num_elementos_actual = 0
-
-    if num_elementos_actual == 0:
-        logging.info("La lista 'unidades/peliculas descuento asociado' está vacía. No se pueden realizar modificaciones.")
-        return ###No es realemnte necesario hacer la validacion de si existe o no la lista o si la lista tiene o no elementos en ella (posible caos modificable dentro de main)
-    logging.info(f"Cantidad actual de opciones de descuento: {num_elementos_actual}")
-    logging.info(f"Cantidad de unidades/peliculas: {descuentos[0].cantidades}, Porcentaje asociado: {descuentos[0].porcentajes}")
-    logging.info("")
-    opcion = validate_integer("Seleccione una opción:\n1. Modificar lista actual\n2. Modificar rango de unidades/peliculas para su descuento asociado\n3. Salir\nIntroduce el numero de la opcion deseada: ")
-    if opcion == 1:
-        for descuento in descuentos:
-            for i in range(len(descuento.cantidades)):
-                cantidad_modificar = descuento.cantidades[i]-1
-                porcentaje_modificar = validate_float(f"Introduce el nuevo porcentaje de descuento para las unidades/peliculas {cantidad_modificar}: ")
-                descuento.porcentajes[i] = porcentaje_modificar
-            descuento.save()
-        logging.info("Descuentos por unidades/peliculas modificados exitosamente!!!")          
-    elif opcion == 2:
-        num_elementos_nuevo = validate_integer("Introduce el nuevo rango de elementos para 'unidades/porcentaje descuento asociado': ")
-        if num_elementos_nuevo < 1:
-            logging.info("La nueva cantidad de elementos en 'unidades/porcentaje descuento asociado' debe ser un numero entero positivo mayor o igual a 1.")
-            return
-        nuevas_cantidades = []
-        nuevos_porcentajes = []
-        for i in range(num_elementos_nuevo):
-            cantidad_modificar = validate_integer(f"Introduce el valor para la cantidad necesaria para el descuento en unidades/peliculas: ")
-            porcentaje_modificar = validate_float(f"Introduce el porcentaje de descuento para la cantidad asociada {cantidad_modificar}: ")
-            nuevas_cantidades.append(cantidad_modificar)
-            nuevos_porcentajes.append(porcentaje_modificar)
-        for descuento in descuentos:
-            descuento.cantidades = nuevas_cantidades
-            descuento.porcentajes = nuevos_porcentajes
-            descuento.save()
-        logging.info(f"Los rangos han sido modificados a {num_elementos_nuevo} posibles descuentos por cierta cantidad de unidades/peliculas rentadas.")
-    elif opcion == 3:
-        logging.info("Saliendo del programa.")
-        return
-    else:
-        logging.info("Opcion invalida. Saliendo del programa.")
-
-def main():
-    costos_existen = Costo.search().execute().hits.total.value > 0
-    descuentos_existen = Descuento.search().execute().hits.total.value > 0
-
-    if costos_existen and descuentos_existen:
-        while True:
-            logging.info("Seleccione una opcion:")
-            logging.info("1. Modificar lista de precios")
-            logging.info("2. Modificar lista de descuentos")
-            logging.info("3. Salir")
-            opcion = validate_integer("Introduce el numero de la opcion deseada: ")
-
-            if opcion == 1:
-                modify_cost()
-            elif opcion == 2:
-                modify_discount()
-            elif opcion == 3:
-                logging.info("Saliendo del programa.")
-                break
-            else:
-                logging.info("Opcion invalida. Intentalo de nuevo.")
-
-    elif not costos_existen:
-        salir = False
-        logging.info("No existe una lista de precios. ¿desea crear una lista?.")
-        while not salir:
-            logging.info("Seleccione una opcion:")
-            logging.info("1. Crear costos")
-            logging.info("2. Salir")
-            opcion = validate_integer("Introduce el numero de la opcion deseada: ")
-
-            if opcion == 1:
-                create_cost()
-                salir = True
-            elif opcion == 2:
-                logging.info("Saliendo del programa.")
-                break
-            else:
-                logging.info("Opcion invalida. Intentalo de nuevo.")
-
-    elif not descuentos_existen:
-        salir = False
-        logging.info("No existe una lista de descuentos. ¿desea crear una lista?.")
-        while not salir:
-            logging.info("Seleccione una opcion:")
-            logging.info("1. Crear descuento")
-            logging.info("2. Salir")
-            opcion = validate_integer("Introduce el numero de la opcion deseada: ")
-
-            if opcion == 1:
-                create_discount()
-                salir = True
-            elif opcion == 2:
-                logging.info("Saliendo del programa.")
-                break
-            else:
-                logging.info("Opcion invalida. Intentalo de nuevo.")
-    else:
-        return
-    
 if __name__ == "__main__":
     main()
