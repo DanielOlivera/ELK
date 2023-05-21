@@ -59,11 +59,14 @@ class Pelicula(Document):
 Pelicula.init()
 
 class Renta(Document):
+    id_cliente = Integer()
     cliente = Text()
     fecha_prestamo = Text()
     fecha_devolucion = Text()
     importe_total = Text()
     peliculas_prestadas = Text()
+    status = Text()
+    multa = Integer()
 
     class Index:
         name = 'index-rentas'
@@ -196,7 +199,6 @@ def facturacion(cliente, peliculas_rentadas):
             logging.info(f"No es posible rentar por más de {longitud_dias} días. Por favor, elija otro número de días.")
         else:
             break
-
     # Buscar descuento aplicable segun la cantidad de peliculas rentadas
     descuento = None
     descuentos = get_all_discounts()
@@ -231,14 +233,23 @@ def renta(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_pr
     else:
         last_id = -1
     next_id = last_id + 1
+    s_cliente = Search(index='index-clientes').query("match", nombre_completo=cliente)
+    response_cliente = s_cliente.execute()
+    if response_cliente.hits.total.value > 0:
+        id_cliente = response_cliente.hits[0].meta.id
     # Generar el nuevo documento para el índice renta
+    status_actual = "En curso"
+    multa = 0
     doc = {
         "_id": next_id,
+        "id_cliente": id_cliente,
         "cliente": cliente,
         "fecha_prestamo": fecha_prestamo,
         "fecha_devolucion": fecha_devolucion,
         "importe_total": importe_total,
-        "peliculas_prestadas": peliculas_prestadas
+        "peliculas_prestadas": peliculas_prestadas,
+        "status":  status_actual, # Establecer el valor del campo "status" como "En Curso"
+        "multa" : multa #Como status siempre va a ser En curso para las rentas recientes entonces multa=0
     }
     Renta(meta={'id': doc["_id"]}, **doc).save()
     logging.info("Registro guardado en el historial de renta correctamente.")
