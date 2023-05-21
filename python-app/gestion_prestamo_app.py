@@ -1,5 +1,5 @@
 from elasticsearch_dsl import Document, Date, Keyword, Text, connections, Search, Q, GeoPoint, Integer, Float
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -132,173 +132,191 @@ def get_all_movies_ordered_by_nominations():
     response = s.execute()
     return response.hits
 
+def get_all_discounts():
+    s = Search(index='index-descuentos')
+    response = s.execute()
+    if response.hits:
+        descuentos = {
+            'cantidades': response.hits[0].cantidades,
+            'porcentajes': response.hits[0].porcentajes
+        }
+        return descuentos
+    return None
+
+def get_rental_cost(num_dias):
+    s = Search(index='index-costos')
+    response = s.execute()
+    if response.hits:
+        costos = response.hits[0].costos
+        if num_dias > len(costos):
+            return None, len(costos)  # Devolvemos None y la longitud de costos
+        dias = response.hits[0].dias
+        if num_dias in dias:
+            index = dias.index(num_dias)
+            return costos[index], len(dias)  # Devolvemos el costo y la longitud de dias
+    return None, 0  # Devolvemos None y 0 si no se encontro el costo o dias
+
+def facturacion(cliente, peliculas_rentadas):
+    # Obtener la cantidad de peliculas rentadas
+    cantidad_peliculas = len(peliculas_rentadas)
+    # Obtener el numero de dias de renta deseado
+    while True:
+        num_dias = int(input("Ingrese la cantidad de días de renta: "))
+        costo, longitud_dias = get_rental_cost(num_dias)
+        if costo is None:
+            logging.info(f"No es posible rentar por más de {longitud_dias} días. Por favor, elija otro número de días.")
+        else:
+            break
+
+    # Buscar descuento aplicable segun la cantidad de peliculas rentadas
+    descuento = None
+    descuentos = get_all_discounts()
+    for i, cantidad in enumerate(descuentos['cantidades']):
+        if cantidad >= cantidad_peliculas:
+            descuento = descuentos['porcentajes'][i]
+            break
+    # Si no se encontro un descuento aplicable, establecer descuento en 0
+    if descuento is None:
+        descuento = 0
+    # Calcular el costo total aplicando el descuento
+    costo_total = costo - (costo * (descuento / 100))
+    # Obtener la fecha actual
+    fecha_actual = datetime.now().strftime("%Y-%m-%d")
+    # Calcular la fecha de devolucion sumando num_dias a la fecha actual
+    fecha_devolucion = (datetime.now() + timedelta(days=num_dias)).strftime("%Y-%m-%d")
+    logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' esta rentando las siguientes peliculas:")
+    for pelicula_rentada in peliculas_rentadas:
+        logging.info(f"Pelicula: {pelicula_rentada}")
+    logging.info(f"Durante {num_dias} dias a partir de la fecha {fecha_actual}")
+    logging.info(f"Fecha de devolucion: {fecha_devolucion}")
+    logging.info(f"Costo total: {costo_total:.2f} con un descuento del {descuento}%")
+
 def main():
     clientes = get_all_clients()
-
     if not clientes:
         logging.info("No hay clientes registrados.")
         return
-
     logging.info("Clientes registrados:")
     for cliente in clientes:
         logging.info(f"_id: {cliente.meta.id}, Nombre completo: {cliente.nombre_completo}")
-
-    query = input("Introduce el término de búsqueda (id, nombre): ")
+    query = input("Introduce el termino de búsqueda (id, nombre): ")
     cliente = search_client(query)
-
     if cliente is None:
-        logging.info(f"No se encontró ningún cliente con el criterio de búsqueda proporcionado '{query}'.")
+        logging.info(f"No se encontro ningun cliente con el criterio de busqueda proporcionado '{query}'.")
         return
-
     if check_cliente_baneado(cliente):
-        logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' está baneado. No se pueden realizar más operaciones.")
+        logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' esta baneado. No se pueden realizar mas operaciones.")
         return
     else:
-        logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' no está baneado. Puede continuar con las operaciones.")
-
-    logging.info(f"'{cliente.nombre_completo}'-'{cliente.meta.id}' qué películas desea rentar")
-
+        logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' puede continuar con la renta de peliculas.")
+    logging.info(f"'{cliente.nombre_completo}'-'{cliente.meta.id}' qué peliculas desea rentar")
     peliculas_rentadas = []
-
     while True:
-        opcion_busqueda = int(input("Selecciona una opción de búsqueda:\n1. Título\n2. Género\n3. Actores\n4. Nominaciones al Oscar\n5. Salir\nOpción: "))
-
+        opcion_busqueda = int(input("Selecciona una opción de busqueda:\n1. Titulo\n2. Genero\n3. Actores\n4. Nominaciones al Oscar\n5. Proceder con la renta\n6. Cancelar\nOpcion: "))
         if opcion_busqueda == 1:
             titles = get_all_titles()
-            logging.info("Títulos de películas disponibles:")
+            logging.info("Titulos de peliculas disponibles:")
             for i, titulo in enumerate(titles):
                 if titulo in peliculas_rentadas:
                     continue
-                logging.info(f"{i+1}. Título: {titulo}")
-                
+                logging.info(f"{i+1}. Título: {titulo}")   
             if len(peliculas_rentadas) == len(titles):
-                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                logging.info("Ya no hay mas peliculas disponibles en esta categoria.")
                 continue
-
-            opcion_pelicula = int(input("Selecciona una película para rentar: "))
-
+            opcion_pelicula = int(input("Selecciona una pelicula para rentar: "))
             if opcion_pelicula < 1 or opcion_pelicula > len(titles):
-                logging.info("Opción inválida. Inténtalo de nuevo.")
+                logging.info("Opcion invalida. Intentalo de nuevo.")
                 continue
-
             pelicula_elegida = titles[opcion_pelicula - 1]
-
             if pelicula_elegida in peliculas_rentadas:
-                logging.info(f"La película '{pelicula_elegida}' ya ha sido rentada previamente.")
+                logging.info(f"La pelicula '{pelicula_elegida}' ya ha sido rentada previamente.")
                 continue
-
             peliculas_rentadas.append(pelicula_elegida)
-            logging.info(f"Se ha rentado la película '{pelicula_elegida}' al cliente '{cliente.meta.id}'.")
-
+            logging.info(f"Se ha rentado la pelicula '{pelicula_elegida}' al cliente '{cliente.meta.id}'.")
         elif opcion_busqueda == 2:
             genres = get_all_genres()
-            logging.info("Géneros de películas disponibles:")
+            logging.info("Generos de peliculas disponibles:")
             for i, genero in enumerate(genres):
                 if genero in peliculas_rentadas:
                     continue
-                logging.info(f"{i+1}. Género: {genero}")
-                
+                logging.info(f"{i+1}. Genero: {genero}") 
             if len(peliculas_rentadas) == len(titles):
-                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                logging.info("Ya no hay mas peliculas disponibles en esta categoria.")
                 continue
-
-            opcion_genero = int(input("Selecciona un género: "))
-
+            opcion_genero = int(input("Selecciona un genero: "))
             if opcion_genero < 1 or opcion_genero > len(genres):
-                logging.info("Opción inválida. Inténtalo de nuevo.")
+                logging.info("Opcion invalida. Intentalo de nuevo.")
                 continue
-
             peliculas = search_movies_by_genre(genres[opcion_genero - 1])
-
             if not peliculas:
-                logging.info(f"No se encontraron películas con el género '{genres[opcion_genero - 1]}'.")
+                logging.info(f"No se encontraron peliculas con el genero '{genres[opcion_genero - 1]}'.")
                 continue
-
-            logging.info("Películas encontradas:")
+            logging.info("Peliculas encontradas:")
             for i, pelicula in enumerate(peliculas):
                 if pelicula.titulo in peliculas_rentadas:
                     continue
-                logging.info(f"{i+1}. Título: {pelicula.titulo}")
-
-            opcion_pelicula = int(input("Selecciona una película para rentar: "))
-
+                logging.info(f"{i+1}. Titulo: {pelicula.titulo}")
+            opcion_pelicula = int(input("Selecciona una pelicula para rentar: "))
             if opcion_pelicula < 1 or opcion_pelicula > len(peliculas):
-                logging.info("Opción inválida. Inténtalo de nuevo.")
+                logging.info("Opcion invalida. Intentalo de nuevo.")
                 continue
-
             pelicula_elegida = peliculas[opcion_pelicula - 1]
-
             if pelicula_elegida.titulo in peliculas_rentadas:
-                logging.info(f"La película '{pelicula_elegida.titulo}' ya ha sido rentada previamente.")
+                logging.info(f"La pelicula '{pelicula_elegida.titulo}' ya ha sido rentada previamente.")
                 continue
-
             peliculas_rentadas.append(pelicula_elegida.titulo)
-            logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
-
+            logging.info(f"Se ha rentado la pelicula '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
         elif opcion_busqueda == 3:
             actors = get_all_actors()
-            logging.info("Actores de películas disponibles:")
+            logging.info("Actores de peliculas disponibles:")
             for i, actor_title in enumerate(actors):
                 if actor_title['titulo'] in peliculas_rentadas:
                     continue
-                logging.info(f"{i+1}. Actor: {actor_title['actor']} - Título: {actor_title['titulo']}")
-            
+                logging.info(f"{i+1}. Actor: {actor_title['actor']} - Titulo: {actor_title['titulo']}")
             if len(peliculas_rentadas) == len(titles):
-                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                logging.info("Ya no hay mas peliculas disponibles en esta categoria.")
                 continue
-            
-            opcion_actor = int(input("Selecciona una película para rentar: "))
-
+            opcion_actor = int(input("Selecciona una pelicula para rentar: "))
             if opcion_actor < 1 or opcion_actor > len(actors):
-                logging.info("Opción inválida. Inténtalo de nuevo.")
+                logging.info("Opcion invalida. Intentalo de nuevo.")
                 continue
-
             pelicula_elegida = actors[opcion_actor - 1]
-
             if pelicula_elegida['titulo'] in peliculas_rentadas:
-                logging.info(f"La película '{pelicula_elegida['titulo']}' ya ha sido rentada previamente.")
+                logging.info(f"La pelicula '{pelicula_elegida['titulo']}' ya ha sido rentada previamente.")
                 continue
-            
             peliculas_rentadas.append(pelicula_elegida['titulo'])
-            logging.info(f"Se ha rentado la película '{pelicula_elegida['titulo']}' al cliente '{cliente.meta.id}'.")
-
+            logging.info(f"Se ha rentado la pelicula '{pelicula_elegida['titulo']}' al cliente '{cliente.meta.id}'.")
         elif opcion_busqueda == 4:
             movies = get_all_movies_ordered_by_nominations()
-            logging.info("Películas ordenadas por número de nominaciones al Oscar:")
+            logging.info("Peliculas ordenadas por numero de nominaciones al Oscar:")
             for i, pelicula in enumerate(movies):
                 if pelicula.titulo in peliculas_rentadas:
                     continue
-                logging.info(f"{i+1}. Título: {pelicula.titulo}, Nominaciones al Oscar: {pelicula.nominaciones_oscar}")
-
+                logging.info(f"{i+1}. Titulo: {pelicula.titulo}, Nominaciones al Oscar: {pelicula.nominaciones_oscar}")
             if len(peliculas_rentadas) == len(titles):
-                logging.info("Ya no hay más películas disponibles en esta categoría.")
+                logging.info("Ya no hay mas peliculas disponibles en esta categoria.")
                 continue
-            
-            opcion_pelicula = int(input("Selecciona una película para rentar: "))
-
+            opcion_pelicula = int(input("Selecciona una pelicula para rentar: "))
             if opcion_pelicula < 1 or opcion_pelicula > len(movies):
-                logging.info("Opción inválida. Inténtalo de nuevo.")
+                logging.info("Opcion invalida. Intentalo de nuevo.")
                 continue
-
             pelicula_elegida = movies[opcion_pelicula - 1]
-
             if pelicula_elegida.titulo in peliculas_rentadas:
-                logging.info(f"La película '{pelicula_elegida.titulo}' ya ha sido rentada previamente.")
+                logging.info(f"La pelicula '{pelicula_elegida.titulo}' ya ha sido rentada previamente.")
                 continue
-
             peliculas_rentadas.append(pelicula_elegida.titulo)
-            logging.info(f"Se ha rentado la película '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
-
+            logging.info(f"Se ha rentado la pelicula '{pelicula_elegida.titulo}' al cliente '{cliente.meta.id}'.")
         elif opcion_busqueda == 5:
-            logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' ha rentado las siguientes películas:")
+            logging.info(f"El cliente '{cliente.nombre_completo}'-'{cliente.meta.id}' ha rentado las siguientes peliculas:")
             for pelicula_rentada in peliculas_rentadas:
-                logging.info(f"Película: {pelicula_rentada}")
+                logging.info(f"Pelicula: {pelicula_rentada}")
+            facturacion(cliente, peliculas_rentadas)
             logging.info("Saliendo del programa.")
             break
-
+        elif opcion_busqueda == 6:
+            return
         else:
-            logging.info("Opción inválida. Inténtalo de nuevo.")
-
+            logging.info("Opcion invalida. Intentalo de nuevo.")
 
 if __name__ == "__main__":
     main()
