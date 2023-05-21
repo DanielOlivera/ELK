@@ -58,6 +58,22 @@ class Pelicula(Document):
 
 Pelicula.init()
 
+class Factura(Document):
+    cliente = Text()
+    fecha_prestamo = Text()
+    fecha_devolucion = Text()
+    importe_total = Text()
+    peliculas_prestadas = Text()
+
+    class Index:
+        name = 'index-facturas'
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
+
+Factura.init()
+
 def search_client(query):
     s = Search(index='index-clientes').query("multi_match", query=query, fields=['_id', 'nombre_completo'])
     response = s.execute()
@@ -171,10 +187,9 @@ def facturacion(cliente, peliculas_rentadas):
     # Buscar descuento aplicable segun la cantidad de peliculas rentadas
     descuento = None
     descuentos = get_all_discounts()
-    for i, cantidad in enumerate(descuentos['cantidades']):
-        if cantidad >= cantidad_peliculas:
-            descuento = descuentos['porcentajes'][i]
-            break
+    for i in range(len(descuentos['cantidades'])):
+        if cantidad_peliculas >= int(descuentos['cantidades'][i]):
+            descuento = int(descuentos['porcentajes'][i])
     # Si no se encontro un descuento aplicable, establecer descuento en 0
     if descuento is None:
         descuento = 0
@@ -190,6 +205,29 @@ def facturacion(cliente, peliculas_rentadas):
     logging.info(f"Durante {num_dias} dias a partir de la fecha {fecha_actual}")
     logging.info(f"Fecha de devolucion: {fecha_devolucion}")
     logging.info(f"Costo total: {costo_total:.2f} con un descuento del {descuento}%")
+    factura(cliente.nombre_completo, fecha_actual, fecha_devolucion, costo_total, peliculas_rentadas)
+
+def factura(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_prestadas):
+    # Obtener el último ID del índice historial
+    s = Search(index='index-facturas').sort({"_id": {"order": "desc"}})
+    response = s.execute()
+    if response.hits.total.value > 0:
+        last_id = int(response.hits[0].meta.id)
+    else:
+        last_id = -1
+    next_id = last_id + 1
+    # Generar el nuevo documento para el índice historial
+    doc = {
+        "_id": next_id,
+        "cliente": cliente,
+        "fecha_prestamo": fecha_prestamo,
+        "fecha_devolucion": fecha_devolucion,
+        "importe_total": importe_total,
+        "peliculas_prestadas": peliculas_prestadas
+    }
+    Factura(meta={'id': doc["_id"]}, **doc).save()
+    logging.info("Registro guardado en el historial correctamente.")
+    return
 
 def main():
     clientes = get_all_clients()
