@@ -140,7 +140,7 @@ def modify_discount():
 
     if num_elementos_actual == 0:
         logging.info("La lista 'unidades/peliculas descuento asociado' está vacía. No se pueden realizar modificaciones.")
-        return ###No es realemnte necesario hacer la validacion de si existe o no la lista o si la lista tiene o no elementos en ella (posible caos modificable dentro de main)
+        return ###No es realemnte necesario hacer la validacion de si existe o no la lista o si la lista tiene o no elementos en ella (posible caso modificable dentro de main)
     logging.info(f"Cantidad actual de opciones de descuento: {num_elementos_actual}")
     logging.info(f"Cantidad de unidades/peliculas: {descuentos[0].cantidades}, Porcentaje asociado: {descuentos[0].porcentajes}")
     logging.info("")

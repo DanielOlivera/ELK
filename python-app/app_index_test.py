@@ -16,4 +16,4 @@ print(res['result'])
 res = es.get(index="index-caratula", id=0)
 print(res['_source'])
 
-
+###no usar lib elasticsearch

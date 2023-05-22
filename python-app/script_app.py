@@ -1,5 +1,5 @@
-from elasticsearch_dsl import Document, Integer, Float, Text, connections, Keyword, GeoPoint
-from elasticsearch_dsl import Date
+from elasticsearch_dsl import Document, Integer, Float, Text, Keyword, GeoPoint, Date
+from elasticsearch_dsl.connections import connections
 import datetime
 import random
 

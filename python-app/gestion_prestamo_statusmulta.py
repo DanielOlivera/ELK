@@ -1,4 +1,4 @@
-from elasticsearch_dsl import Document, Integer, connections, Float, Text, Search
+from elasticsearch_dsl import Document, Date, Integer, connections, Float, Text, Search
 from datetime import datetime
 import logging
 
@@ -8,9 +8,9 @@ connections.create_connection(hosts=['elasticsearch:9200'])
 class Renta(Document):
     id_cliente = Integer()
     cliente = Text()
-    fecha_prestamo = Text()
-    fecha_devolucion = Text()
-    importe_total = Text()
+    fecha_prestamo = Date()
+    fecha_devolucion = Date()
+    importe_total = Float()
     peliculas_prestadas = Text()
     status = Text()
     multa = Integer()
