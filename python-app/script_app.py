@@ -1,8 +1,9 @@
-from elasticsearch_dsl import Document, Integer, Date, Float, Text, connections, Keyword, GeoPoint
-from datetime import datetime
+from elasticsearch_dsl import Document, Integer, Float, Text, connections, Keyword, GeoPoint
+from elasticsearch_dsl import Date
+import datetime
 import random
 
-es = connections.create_connection(hosts=['elasticsearch:9200'])
+connections.create_connection(hosts=['elasticsearch:9200'])
 
 class Pelicula(Document):
     duracion_minutos = Integer()
@@ -424,12 +425,12 @@ for pelicula_data in peliculas:
     ).execute()
 
     if existing_pelicula.hits.total.value > 0:
-        print(f"La película '{pelicula_data['titulo']}' ya existe en el índice. No se agregará nuevamente.")
+        print(f"La pelicula '{pelicula_data['titulo']}' ya existe en el indice. No se agregara nuevamente.")
         continue
 
     pelicula = Pelicula(**pelicula_data)
     pelicula.save()
-    print(f"La película '{pelicula.titulo}' ha sido agregada al índice.")
+    print(f"La pelicula '{pelicula.titulo}' ha sido agregada al indice.")
 
 print("Proceso completado.")
 
@@ -656,11 +657,11 @@ clientes = [
 
 for cliente_data in clientes:
     existing_cliente = Cliente.search().query(
-        'match', correo_electronico=cliente_data['nombre_completo']
+        'match', nombre_completo=cliente_data['nombre_completo']
     ).execute()
 
     if existing_cliente.hits.total.value > 0:
-        print(f"El cliente '{cliente_data['nombre_completo']}' ya existe en el índice. No se agregará nuevamente.")
+        print(f"El cliente '{cliente_data['nombre_completo']}' ya existe en el indice. No se agregara nuevamente.")
         continue
 
     cliente = Cliente(**cliente_data)
@@ -672,9 +673,9 @@ print("Proceso completado.")
 class Renta(Document):
     id_cliente = Integer()
     cliente = Text()
-    fecha_prestamo = Text()
-    fecha_devolucion = Text()
-    importe_total = Integer()
+    fecha_prestamo = Date()
+    fecha_devolucion = Date()
+    importe_total = Float()
     peliculas_prestadas = Text()
     status = Text()
     multa = Integer()
@@ -686,7 +687,7 @@ class Renta(Document):
             'number_of_replicas': 0
         }
 
-Renta.init(using=es)
+Renta.init()
 
 # Obtener una lista de clientes y películas existentes
 clientes = clientes = [
@@ -897,14 +898,30 @@ peliculas =  [
 
 rentas = []
 
+
+
 for _ in range(40):
     cliente = random.choice(clientes)
-    fecha_prestamo = f"2023-{random.randint(1, 4):02d}-{random.randint(1, 30):02d}"
-    diferencia_dias = random.randint(1, 15)
-    fecha_devolucion = f"2023-{random.randint(1, 4):02d}-{random.randint(1, 30 - diferencia_dias):02d}"
-    importe_total = 1
+    
     num_peliculas_prestadas = random.randint(1, 4)
+
     peliculas_prestadas = random.sample(peliculas, num_peliculas_prestadas)
+    
+
+    dia_prestamo = random.randint(1, 31)
+    fecha_prestamo = datetime.date(2023, 5, dia_prestamo)
+
+    diferencia_dias = random.randint(1, 5)
+    fecha_devolucion = fecha_prestamo + datetime.timedelta(days=diferencia_dias)
+
+    if fecha_devolucion.month != fecha_prestamo.month:
+        for dia in range(1, fecha_devolucion.day + 1):
+            fecha_devolucion = datetime.date(2023, fecha_prestamo.month + 1, dia)
+
+    fecha_prestamo_formatted = fecha_prestamo.strftime("%Y-%m-%d")
+    fecha_devolucion_formatted = fecha_devolucion.strftime("%Y-%m-%d")
+
+    importe_total = "1"
     status = "En Curso"
     multa = 0
 
@@ -914,12 +931,15 @@ for _ in range(40):
         fecha_prestamo=fecha_prestamo,
         fecha_devolucion=fecha_devolucion,
         importe_total=importe_total,
-        peliculas_prestadas=", ".join([pelicula["titulo"] for pelicula in peliculas_prestadas]),
+        peliculas_prestadas=", ".join([f"{pelicula['titulo']}" for pelicula in peliculas_prestadas]),
         status=status,
         multa=multa
-    )
+    )  
+    
+    print(f"El cliente '{renta.cliente}' rento las siguientes peliculas '{renta.peliculas_prestadas}'")
+    print(f"Fecha de renta '{renta.fecha_prestamo}', durante: '{diferencia_dias}', hasta el: '{renta.fecha_devolucion}'")
 
     rentas.append(renta)
 
 for renta in rentas:
-    renta.save(using=es)
+    renta.save()
