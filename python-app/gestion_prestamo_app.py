@@ -225,7 +225,6 @@ def facturacion(cliente, peliculas_rentadas):
     
 
 def renta(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_prestadas):
-    # Obtener el último ID del índice renta
     s = Search(index='index-rentas').sort({"_id": {"order": "desc"}})
     response = s.execute()
     if response.hits.total.value > 0:
@@ -249,7 +248,7 @@ def renta(cliente, fecha_prestamo, fecha_devolucion, importe_total, peliculas_pr
         "importe_total": importe_total,
         "peliculas_prestadas": peliculas_prestadas,
         "status":  status_actual, # Establecer el valor del campo "status" como "En Curso"
-        "multa" : multa #Como status siempre va a ser En curso para las rentas recientes entonces multa=0
+        "multa" : multa #Como status siempre va a estar En curso para las rentas recientes entonces multa=0
     }
     Renta(meta={'id': doc["_id"]}, **doc).save()
     logging.info("Registro guardado en el historial de renta correctamente.")

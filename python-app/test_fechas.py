@@ -11,6 +11,14 @@ if fecha_devolucion.month != fecha_prestamo.month:
     for dia in range(1, fecha_devolucion.day + 1):
         fecha_devolucion = datetime.date(2023, fecha_prestamo.month + 1, dia)
 
-print("Fecha de préstamo:", fecha_prestamo)
-print("Dias de renta:", diferencia_dias)
-print("Fecha de devolución:", fecha_devolucion)
+#print("Fecha de préstamo:", fecha_prestamo)
+#print("Dias de renta:", diferencia_dias)
+#print("Fecha de devolución:", fecha_devolucion)
+
+costo_renta = 4
+num_peliculas_prestadas = 2
+descuento = 5
+
+importe_total = (costo_renta - (costo_renta * (descuento / 100)))*num_peliculas_prestadas
+
+print(importe_total)

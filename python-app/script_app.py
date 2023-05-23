@@ -1,5 +1,6 @@
-from elasticsearch_dsl import Document, Integer, Float, Text, Keyword, GeoPoint, Date
+from elasticsearch_dsl import Document, Integer, Float, Text, Keyword, GeoPoint, Date, Search
 from elasticsearch_dsl.connections import connections
+from datetime import date
 import datetime
 import random
 
@@ -25,6 +26,7 @@ class Pelicula(Document):
         }
 
 Pelicula.init()
+
 
 peliculas = [
     {
@@ -434,6 +436,7 @@ for pelicula_data in peliculas:
 
 print("Proceso completado.")
 
+
 class Cliente(Document):
     nombre_completo = Text(fields={'raw': Keyword()})
     numero_celular = Keyword()
@@ -451,6 +454,7 @@ class Cliente(Document):
         }
 
 Cliente.init()
+
 
 clientes = [
   {
@@ -670,6 +674,7 @@ for cliente_data in clientes:
     
 print("Proceso completado.")
 
+
 class Renta(Document):
     id_cliente = Integer()
     cliente = Text()
@@ -689,7 +694,56 @@ class Renta(Document):
 
 Renta.init()
 
-# Obtener una lista de clientes y películas existentes
+class EstadoMultas(Document):
+    estado = Text()
+    multas = Float()
+
+    class Index:
+        name = 'index-estadomultas'
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
+
+EstadoMultas.init()
+
+class Costo(Document):
+    dias = Integer(multi=True)
+    costos = Float(multi=True)
+
+    class Index:
+        name = 'index-costos'
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
+
+Costo.init()
+
+class Descuento(Document):
+    cantidades = Integer(multi=True)
+    porcentajes = Float(multi=True)
+
+    class Index:
+        name = 'index-descuentos'
+        settings = {
+            'number_of_shards': 1,
+            'number_of_replicas': 0
+        }
+
+Descuento.init()
+
+def get_all_discounts():
+    s = Search(index='index-descuentos')
+    response = s.execute()
+    if response.hits:
+        descuentos = {
+            'cantidades': response.hits[0].cantidades,
+            'porcentajes': response.hits[0].porcentajes
+        }
+        return descuentos
+    return None
+
 clientes = clientes = [
     {
         "nombre_completo": "Carlos Aguilar",
@@ -897,32 +951,75 @@ peliculas =  [
 ]
 
 rentas = []
-
-
+next_id = 0
 
 for _ in range(40):
+    
     cliente = random.choice(clientes)
-    
-    num_peliculas_prestadas = random.randint(1, 4)
-
+    num_peliculas_prestadas = random.randint(1, 5)
     peliculas_prestadas = random.sample(peliculas, num_peliculas_prestadas)
-    
-
-    dia_prestamo = random.randint(1, 31)
+    peliculas_prestadas = ", ".join([f"{pelicula['titulo']}" for pelicula in peliculas_prestadas])
+    dia_prestamo = random.randint(1, 22) ### MODIFICAR ESTO
     fecha_prestamo = datetime.date(2023, 5, dia_prestamo)
-
     diferencia_dias = random.randint(1, 5)
     fecha_devolucion = fecha_prestamo + datetime.timedelta(days=diferencia_dias)
-
     if fecha_devolucion.month != fecha_prestamo.month:
         for dia in range(1, fecha_devolucion.day + 1):
             fecha_devolucion = datetime.date(2023, fecha_prestamo.month + 1, dia)
-
     fecha_prestamo_formatted = fecha_prestamo.strftime("%Y-%m-%d")
     fecha_devolucion_formatted = fecha_devolucion.strftime("%Y-%m-%d")
+     
+    date_now = date.today()
+    diferencia_dias_calc = (date_now - fecha_prestamo).days
+    print(diferencia_dias_calc)
+    
+    estado = EstadoMultas.search().source(['estado']).execute()
+    estados_posibles = [hit.estado for hit in estado.hits]
+    #status = random.choice(estados_posibles[0])
 
-    importe_total = "1"
-    status = "En Curso"
+    descuento = None
+    descuentos = get_all_discounts()
+    for i in range(len(descuentos['cantidades'])):
+        if num_peliculas_prestadas >= int(descuentos['cantidades'][i]):
+            descuento = int(descuentos['porcentajes'][i])
+    if descuento is None:
+        descuento = 0
+    
+    costo = Costo.search().source(['dias','costos']).execute()
+    dias = costo.hits[0].dias
+    costos = costo.hits[0].costos
+    importe_total=0
+    
+    if diferencia_dias_calc <= 5:
+        status = estados_posibles[0][1]
+        if diferencia_dias_calc in dias:
+            if diferencia_dias_calc in dias:
+                posicion = dias.index(int(diferencia_dias_calc))
+                costo_renta = costos[posicion]
+            importe_total = (costo_renta - (costo_renta * (descuento / 100)))*num_peliculas_prestadas
+            print("En Curso")
+            Renta.importe_total = importe_total
+
+  
+    elif diferencia_dias_calc > 5 and diferencia_dias_calc <= 10:
+        status = random.choice([estados_posibles[0][0], estados_posibles[0][2]])
+        if status == 'Devuelto': #Mejorar Logica
+            print("Devuelto") #Mejorar Logica
+            Renta.importe_total = 1111 #Mejorar Logica
+        elif status == 'En Mora': #Mejorar Logica
+            print("En Mora") #Mejorar Logica
+            Renta.importe_total = 2222 #Mejorar Logica
+        
+
+    elif diferencia_dias_calc > 10:
+        status = random.choice([estados_posibles[0][0], estados_posibles[0][3]])
+        if status == 'Devuelto': #Mejorar Logica
+            print("Devuelto") #Mejorar Logica
+            Renta.importe_total = 1111 #Mejorar Logica
+        elif status == 'Perdido': #Mejorar Logica
+            print("Perdido") #Mejorar Logica
+            Renta.importe_total = 3333 #Mejorar Logica
+            
     multa = 0
 
     renta = Renta(
@@ -931,14 +1028,14 @@ for _ in range(40):
         fecha_prestamo=fecha_prestamo,
         fecha_devolucion=fecha_devolucion,
         importe_total=importe_total,
-        peliculas_prestadas=", ".join([f"{pelicula['titulo']}" for pelicula in peliculas_prestadas]),
+        peliculas_prestadas=peliculas_prestadas,
         status=status,
         multa=multa
     )  
     
     print(f"El cliente '{renta.cliente}' rento las siguientes peliculas '{renta.peliculas_prestadas}'")
-    print(f"Fecha de renta '{renta.fecha_prestamo}', durante: '{diferencia_dias}', hasta el: '{renta.fecha_devolucion}'")
-
+    print(f"Fecha de renta '{renta.fecha_prestamo}', durante: '{diferencia_dias}' dias, hasta el: '{renta.fecha_devolucion}'")
+   
     rentas.append(renta)
 
 for renta in rentas:
