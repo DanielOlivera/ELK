@@ -951,7 +951,14 @@ peliculas =  [
 ]
 
 rentas = []
-next_id = 0
+
+s = Search(index='index-rentas').sort({'_id': {'order': 'desc'}})
+id_prestamo = s.execute()
+if id_prestamo.hits.total.value > 0:
+    last_id = int(id_prestamo.hits[0].meta.id)
+else:
+    last_id = 0
+next_id = last_id + 1
 
 for _ in range(40):
     
@@ -1023,6 +1030,7 @@ for _ in range(40):
     multa = 0
 
     renta = Renta(
+        _id=str(next_id),
         id_cliente=cliente["_id"],
         cliente=cliente["nombre_completo"],
         fecha_prestamo=fecha_prestamo,
@@ -1031,12 +1039,16 @@ for _ in range(40):
         peliculas_prestadas=peliculas_prestadas,
         status=status,
         multa=multa
-    )  
-    
+    ) 
+       
     print(f"El cliente '{renta.cliente}' rento las siguientes peliculas '{renta.peliculas_prestadas}'")
     print(f"Fecha de renta '{renta.fecha_prestamo}', durante: '{diferencia_dias}' dias, hasta el: '{renta.fecha_devolucion}'")
    
     rentas.append(renta)
+    next_id += 1
+
+if last_id > 0:
+    Renta(meta={'id': str(last_id)})
 
 for renta in rentas:
     renta.save()
